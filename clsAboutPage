@@ -1,0 +1,31 @@
+Sub Class_Globals
+	Private Root As B4XView 'ignore
+	Private xui As XUI 'ignore
+	Private btnAboutClose As B4XView
+	Private imgLogo As B4XView
+End Sub
+
+'You can add more parameters here.
+Public Sub Initialize As Object
+	Return Me
+End Sub
+
+'This event will be called once, before the page becomes visible.
+Private Sub B4XPage_Created (Root1 As B4XView)
+	Root = Root1
+	'load the layout to Root
+	Root.LoadLayout("AboutPage")
+End Sub
+
+Public Sub ShowModal
+	Dim frm As Form = B4XPages.GetNativeParent(Me)
+	frm.WindowLeft = 400
+	frm.WindowTop = 100
+	frm.ShowAndWait
+End Sub
+'You can see the list of page related events in the B4XPagesManager object. The event name is B4XPage.
+
+Private Sub btnAboutClose_Click
+	Dim frm As Form = B4XPages.GetNativeParent(Me)
+	frm.Close
+End Sub
