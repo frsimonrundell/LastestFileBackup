@@ -1,0 +1,190 @@
+#Region Shared Files
+#CustomBuildAction: folders ready, %WINDIR%\System32\Robocopy.exe,"..\..\Shared Files" "..\Files"
+'Ctrl + click to sync files: ide://run?file=%WINDIR%\System32\Robocopy.exe&args=..\..\Shared+Files&args=..\Files&FilesSync=True
+#End Region
+
+'Ctrl + click to export as zip: ide://run?File=%B4X%\Zipper.jar&Args=Project.zip
+
+Sub Class_Globals
+	Private Root As B4XView
+	Private xui As XUI
+	Private flist As List
+	Private labelFolder As B4XView
+	Private labelSize As B4XView
+	Private DC As DirectoryChooser
+	Private TargetDir As DirectoryChooser
+	Private listFiles As CustomListView
+
+	Private btnExit As B4XView
+	Private txtFldr As B4XView
+	Private btnChoose As B4XView
+	Private btnBackup As B4XView
+
+	Private btnAbout As B4XView
+	Private frmAbout As clsAboutPage
+	Private lblSearchSuffix As B4XView
+	Private txtSearchSuffix As B4XView
+End Sub
+
+Public Sub Initialize
+'	B4XPages.GetManager.LogEvents = True
+	flist.Initialize
+	DC.Initialize
+	DC.InitialDirectory="E:\"
+	DC.Title="Select Backup Directory"
+	TargetDir.Initialize
+	TargetDir.InitialDirectory="c:\"
+	TargetDir.Title="Select where to backup to..."
+	frmAbout.Initialize
+
+End Sub
+
+'This event will be called once, before the page becomes visible.
+Private Sub B4XPage_Created (Root1 As B4XView)
+	Root = Root1
+	Root.Height=180
+	Root.LoadLayout("MainPage")
+	B4XPages.SetTitle(Me, "Backup latest files")
+	
+	btnChoose.RequestFocus
+	
+	'load in background About Page
+	B4XPages.AddPageAndCreate("frmAbout", frmAbout)
+End Sub
+
+'You can see the list of page related events in the B4XPagesManager object. The event name is B4XPage.
+
+Private Sub btnStart_Click
+	
+	listFiles.Clear
+	
+	If Not (txtSearchSuffix.Text.StartsWith(".")) Then
+		txtSearchSuffix.Text="." & txtSearchSuffix.Text
+	End If
+	
+	If txtSearchSuffix.Text.Length<2 Then
+		xui.MsgboxAsync("You need to input a proper file extension for the search to succeed", "CodeMonkey Design")
+	Else
+		GetTheFolderContents(txtFldr.Text)
+	End If
+End Sub
+
+Sub GetTheFolderContents (fldr As String)
+	Dim folders As List
+	Dim fns As NameAndLastModified
+	Dim currentDirList As List
+	
+	fns.Initialize
+	folders.Initialize
+	currentDirList.Initialize
+	flist.Clear
+	DateTime.DateFormat="dd/MM/yyyy hh:mm:ss"
+	folders.Add(fldr)
+	Do While folders.Size > 0
+		fldr = folders.Get(0)
+		folders.RemoveAt(0)
+		labelFolder.Text = fldr ' Show this folder
+		labelSize.Text = $"Total files: ${flist.Size}"$
+		Sleep(0)
+		Dim entries As List = File.ListFiles(fldr)
+		If entries.IsInitialized Then
+			currentDirList.Clear
+			For Each x As String In entries
+				If File.IsDirectory(fldr, x) Then
+					folders.Add(File.Combine(fldr, x)) ' Found a subfolder
+				Else
+					
+					If File.Combine(fldr,x).Contains(txtSearchSuffix.Text) Then 
+						fns.name=File.Combine(fldr, x)
+						fns.lastModified=File.LastModified(fldr, x)
+						currentDirList.Add(fns)
+					End If
+					
+				End If
+			Next
+			' Having looked for all the .wpress listFiles, now sort them
+			If currentDirList.Size >0 Then
+				currentDirList.SortType("lastModified", True)
+				Dim fns As NameAndLastModified=currentDirList.Get(0)
+				' Log("name: " & fns.name & " Last Modified: " & DateTime.Date(fns.lastModified))
+				flist.Add(fns.name) ' Found a file; add it to list 'fList'
+				listFiles.AddTextItem(DateTime.Date(fns.lastModified) & " " & fns.name, DateTime.Date(fns.lastModified) & " " & fns.name) ' add to visible list
+			End If
+		End If
+	Loop
+	
+	xui.MsgboxAsync("The search has been completed", "CodeMonkey Design")
+	
+End Sub
+
+Private Sub btnExit_Click
+	ExitApplication
+End Sub
+
+Private Sub btnChoose_Click
+	Dim form As Form = B4XPages.GetNativeParent(Me)
+	form.WindowHeight = 160dip
+	listFiles.Clear
+	txtFldr.Text=DC.Show(B4XPages.GetNativeParent(Me))
+	Dim form As Form = B4XPages.GetNativeParent(Me)
+	form.WindowHeight = 650dip
+	btnStart_Click
+End Sub
+
+Private Sub btnBackup_Click
+	
+	Private TD As String
+	Private filename As String
+	Private dirpath As String
+	Private eofslash As Int
+	Private copycount As Int
+	
+	copycount=0
+	
+	' Are there any files listed?
+	If listFiles.Size=0 Then
+		xui.MsgboxAsync("No files to backup have been selected yet", "CodeMonkey Design")
+	Else
+		' define target directory
+		TD=TargetDir.Show(B4XPages.GetNativeParent(Me))
+		
+		For Each backupfile As String In flist
+			
+			eofslash=backupfile.LastIndexOf("\")
+			dirpath=backupfile.SubString2(0, eofslash)
+			filename=backupfile.SubString(eofslash+1)
+					
+			labelFolder.Text = "Now copying " & dirpath & "\" & filename
+			
+			setListFiles(copycount, "Copying...")
+						
+			Wait For (File.CopyAsync(dirpath,filename, TD, filename)) Complete (Success As Boolean)
+			
+			setListFiles(copycount, "Complete")
+			
+			copycount=copycount+1
+			
+		Next
+		
+		labelFolder.Text = "Ready..."
+		xui.MsgboxAsync("All Files Copied", "CodeMonkey Design")
+		listFiles.Clear
+		
+	End If
+End Sub
+
+Private Sub btnAbout_Click
+
+	frmAbout.ShowModal
+	
+End Sub
+
+Sub setListFiles(copycount As Int, Msg As String)
+	Dim currentPanel As B4XView = listFiles.GetPanel(copycount)
+	Dim selColor As Int = xui.Color_ARGB(255,144,238,144)
+	currentPanel.Color = selColor
+	currentPanel.GetView(0).text = Msg    '1st label in item panel at given index i
+	currentPanel.RemoveViewFromParent
+	listFiles.ReplaceAt(copycount,currentPanel, currentPanel.Height, Msg)
+End Sub
+
